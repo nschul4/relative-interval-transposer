@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "subprojects/cli-sanity",
+    "subprojects/midi-logger-vst",
+    "subprojects/midi-transform-vst",
+]
+resolver = "2"

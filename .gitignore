@@ -1,0 +1,26 @@
+**/tmp*
+
+# Cargo target directory containing all compiled binaries, dependencies, and build artifacts
+/target/
+
+# Cargo lockfile
+# Note: Keep Cargo.lock checked in if this project is a final application/binary. 
+# If it's strictly a library/workspace root, you can un-comment the line below:
+# Cargo.lock
+
+# Optional Cargo cache and temporary files
+**/*.rs.bk
+*.pdb
+*.dll
+*.so
+*.dylib
+
+# IDE / Editor configuration folders
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS-generated files
+.DS_Store
+Thumbs.db
