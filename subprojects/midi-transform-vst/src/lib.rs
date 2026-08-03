@@ -67,9 +67,10 @@ impl Plugin for MidiTransform {
                     } 
                     // 2. Multi-note interval trigger (Root + Offset Key)
                     else if let Some(root) = self.root_note {
+                        let root_idx = (root & 0x7F) as usize;
                         if note != root {
                             // Silence the Root note if it is currently sounding
-                            if let Some(root_pitch) = self.sounding_pitch[root as usize].take() {
+                            if let Some(root_pitch) = self.sounding_pitch[root_idx].take() {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
@@ -90,11 +91,11 @@ impl Plugin for MidiTransform {
                                 });
                             }
 
+                            // Calculate base interval relative to root
                             let interval = note as i32 - root as i32;
                             self.step_count += 1;
-
                             // Calculate transposed target pitch
-                            let target_pitch = (note as i32 + (self.step_count * interval)).clamp(0, 127) as u8;
+                            let target_pitch = (root as i32 + (self.step_count * interval)).clamp(0, 127) as u8;
                             
                             nih_log!(
                                 "[Transposer] Root: {} | Interval: {} | Step: {} -> Out Pitch: {}", 
