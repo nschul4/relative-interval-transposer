@@ -57,35 +57,37 @@ The **Relative Interval Transposer** is a MIDI FX plugin that intercepts incomin
 * **Behavior:**
 
 1. The plugin sets `Root Note = Incoming Pitch`.
-2. The accumulator `Step Count` is reset to `0`.
-3. The plugin outputs the note at its original pitch.
+2. The `Current Pitch` is initialized to `Root Note`.
+3. The accumulator `Step Count` is reset to `0`.
+4. The plugin outputs the note at its original pitch.
 
 #### State 2: Accumulative Interval Transposition (Multi-Note Input)
 
 * **Trigger:** Two notes are struck simultaneously or held together, where one note matches `Root Note` and the second note is `Offset Note`.
 * **Behavior:**
 
-1. Calculate base interval:
+1. Calculate interval relative to Root:
 
 $$\text{Interval} = \text{Pitch}_{\text{Offset}} - \text{Pitch}_{\text{Root}}$$
 
-
 2. Increment step count: `Step Count += 1`
-3. Calculate output pitch:
+3. Calculate new output pitch additively from `Current Pitch`:
 
-$$\text{Output Pitch} = \text{Pitch}_{\text{Offset}} + (\text{Step Count} \times \text{Interval})$$
+$$\text{Output Pitch} = \text{Current Pitch} + \text{Interval}$$
 
+4. Update state: `Current Pitch = Output Pitch`
+5. Intercept the raw input notes and emit only the newly calculated `Output Pitch`.
 
-4. Intercept the raw input notes and emit only the newly calculated `Output Pitch`.
+---
 
 ### 3.3 Execution Walkthrough
 
 | Step | User Input | Engine State | Math / Calculation | Plugin MIDI Output |
 | --- | --- | --- | --- | --- |
-| **1** | Play **C3** alone | `Root = C3`, `Step = 0` | Baseline | **C3** |
-| **2** | Play **C3 + E3** | `Interval = +4` (+4 st), `Step = 1` | $E3 + (1 \times 4) = E3$ | **E3** |
-| **3** | Re-strike **C3 + E3** | `Interval = +4`, `Step = 2` | $E3 + (2 \times 4) = G\#3$ | **G#3** |
-| **4** | Re-strike **C3 + E3** | `Interval = +4`, `Step = 3` | $E3 + (3 \times 4) = C4$ | **C4** |
+| **1** | Play **C3 (60)** alone | `Root = 60`, `Current = 60`, `Step = 0` | Baseline | **C3 (60)** |
+| **2** | Play **C3 + E3 (64)** | `Interval = +4`, `Step = 1` | $60 + 4 = 64$ | **E3 (64)** |
+| **3** | Re-strike **E3 (64)** | `Interval = +4`, `Step = 2` | $64 + 4 = 68$ | **G#3 (68)** |
+| **4** | Strike **F3 (65)** while holding **C3** | `Interval = +5`, `Step = 3` | $68 + 5 = 73$ | **C#4 (73)** |
 
 ---
 
