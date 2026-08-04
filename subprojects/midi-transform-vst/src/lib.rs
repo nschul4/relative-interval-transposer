@@ -60,6 +60,20 @@ impl Plugin for MidiTransform {
         self.params.clone()
     }
 
+    fn initialize(
+        &mut self,
+        _audio_config: &AudioIOLayout,
+        _buffer_config: &BufferConfig,
+        _context: &mut impl InitContext<Self>,
+    ) -> bool {
+        nih_log!(
+            "[Transposer] Instantiated {} v{}",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION")
+        );
+        true
+    }
+
     fn process(
         &mut self,
         _buffer: &mut Buffer,
