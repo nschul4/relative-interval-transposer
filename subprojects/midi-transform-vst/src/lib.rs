@@ -9,6 +9,7 @@ pub struct MidiTransform {
     // Maps physical key index -> Active Output Pitch currently sounding on the synth/host
     sounding_pitch: [Option<u8>; 128],
     root_note: Option<u8>,
+    current_pitch: Option<u8>,
     step_count: i32,
 }
 
@@ -22,6 +23,7 @@ impl Default for MidiTransform {
             held_notes: [false; 128],
             sounding_pitch: [None; 128],
             root_note: None,
+            current_pitch: None,
             step_count: 0,
         }
     }
@@ -71,9 +73,10 @@ impl Plugin for MidiTransform {
                     self.held_notes[note_idx] = true;
                     let active_count = self.held_notes.iter().filter(|&&h| h).count();
 
-                    // 1. Single note pressed: Establish Root and pass through note as-is
+                    // 1. Single note pressed: Establish Root and Pass-through baseline note
                     if active_count == 1 {
                         self.root_note = Some(note);
+                        self.current_pitch = Some(note);
                         self.step_count = 0;
 
                         self.sounding_pitch[note_idx] = Some(note);
@@ -105,12 +108,16 @@ impl Plugin for MidiTransform {
                                 });
                             }
 
-                            // Calculate base interval relative to root
+                            // Calculate base interval relative to root key
                             let interval = note as i32 - root as i32;
                             self.step_count += 1;
-                            // Calculate transposed target pitch
-                            let target_pitch = (root as i32 + (self.step_count * interval)).clamp(0, 127) as u8;
-                            
+
+                            // Accumulator logic: add interval directly to current output pitch
+                            let base_pitch = self.current_pitch.unwrap_or(root) as i32;
+                            let target_pitch = (base_pitch + interval).clamp(0, 127) as u8;
+
+                            self.current_pitch = Some(target_pitch);
+
                             nih_log!(
                                 "[Transposer] Root: {} | Interval: {} | Step: {} -> Out Pitch: {}", 
                                 root, interval, self.step_count, target_pitch
@@ -147,6 +154,7 @@ impl Plugin for MidiTransform {
                     // Reset root tracking and state if all keys have been released
                     if !self.held_notes.iter().any(|&h| h) {
                         self.root_note = None;
+                        self.current_pitch = None;
                         self.step_count = 0;
                         self.sounding_pitch = [None; 128];
                     }

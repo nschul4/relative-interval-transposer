@@ -12,7 +12,11 @@ The project is a cross-platform (Windows-first) MIDI-in / MIDI-out VST3 audio pl
 * **Terminal Environment:** Cygwin (Bash) driving native Windows/Rust toolchains (`x86_64-pc-windows-msvc`)
 * **IDE / Editor:** Visual Studio Code
 * **Target Host / DAW:** Ableton Live (Windows VST3 host)
-* **Debugging & Telemetry:** Output logs routed via `nih_log!` and monitored using Microsoft DebugView (`Dbgview.exe`)
+* **Debugging & Telemetry:**
+  * **Realtime Plugin State & Logic:** Logged via `nih_log!` and monitored using Microsoft DebugView (`Dbgview.exe` / `dbgviewcli64.exe`) or written directly to file via `NIH_LOG`.
+  * **Host & VST3 Instantiation Troubleshooting:** Inspect Ableton's native application diagnostic log at:
+    `C:\Users\austyn\AppData\Roaming\Ableton\Live 11.0.11\Preferences\Log.txt`
+    *(Crucial for diagnosing issue scenarios where the VST3 fails to scan, crashes on instantiation, or silently rejects being dragged onto a track).*
 * **Realtime Safety:** The processing thread avoids dynamic heap allocations (`HashMap`/`HashSet`). Internal state maps 128 MIDI notes using fixed-size stack arrays.
 
 ### 1.3 Build & Deployment Pipeline
