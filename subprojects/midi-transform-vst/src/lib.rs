@@ -1,4 +1,5 @@
 use nih_plug::prelude::*;
+use std::num::NonZeroU32;
 use std::sync::Arc;
 
 pub struct MidiTransform {
@@ -33,7 +34,20 @@ impl Plugin for MidiTransform {
     const EMAIL: &'static str = "";
     const VERSION: &'static str = "0.1.0";
 
-    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[];
+    // Standard stereo audio I/O layout required for Ableton Live track instantiation
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
+        AudioIOLayout {
+            main_input_channels: NonZeroU32::new(2),
+            main_output_channels: NonZeroU32::new(2),
+            ..AudioIOLayout::const_default()
+        },
+        AudioIOLayout {
+            main_input_channels: None,
+            main_output_channels: NonZeroU32::new(2),
+            ..AudioIOLayout::const_default()
+        },
+    ];
+
     const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
     const MIDI_OUTPUT: MidiConfig = MidiConfig::MidiCCs;
 
@@ -154,8 +168,8 @@ impl Vst3Plugin for MidiTransform {
         0xB0, 0x33, 0x61, 0x98, 0xC4, 0xD2, 0xE3, 0x01,
     ];
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
-        Vst3SubCategory::Fx,
-        Vst3SubCategory::Tools,
+        Vst3SubCategory::Instrument,
+        Vst3SubCategory::Synth,
     ];
 }
 
