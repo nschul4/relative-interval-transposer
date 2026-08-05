@@ -1,131 +1,63 @@
-# Relative Interval Transposer (MIDI FX)
+# Relative Interval Transposer
 
-A VST3 MIDI plugin workspace built in **Rust** using the **NIH-plug** framework.
+A VST3 MIDI plugin workspace built in Rust using the [NIH-plug](https://github.com/robbert-vdh/nih-plug) framework.
 
-This project builds a VST that intercepts incoming MIDI note streams and dynamically transposes pitches based on a user-defined **Root Note** and **Interval Trigger**. Holding a root key while striking an offset key calculates the musical interval and steps the transposition outward on subsequent hits, providing an expressive tool for live performance and algorithmic composition.
+The primary plugin intercepts incoming MIDI notes and dynamically transposes pitch based on an interval played against a held **Root Note**. Striking offset keys while holding the root calculates the interval and steps the transposition outward on each subsequent trigger.
 
 ---
 
 ## Workspace Layout
 
-The repository is structured as a **Cargo Workspace** containing both sanity-check subprojects and the primary MIDI plugin:
-
 ```text
 .
-├── Cargo.toml                  # Workspace manifest[cite: 2]
-├── mklink.bat                  # Automated VST3 directory junction helper[cite: 2]
+├── Cargo.toml                  # Workspace manifest
+├── mklink.bat                  # Windows VST3 directory junction helper
+├── checklink.bat               # VST3 junction verification helper
+├── safe-build.sh               # In-place VST3 bundle update script
 └── subprojects/
-    ├── cli-sanity/             # Console app to verify Rust toolchain setup[cite: 2]
-    ├── midi-logger-vst/        # Diagnostic VST3 pass-through MIDI logger[cite: 2]
-    └── midi-transform-vst/     # Primary Relative Interval Transposer plugin[cite: 2]
+    ├── cli-sanity/             # Toolchain verification CLI
+    ├── midi-logger-vst/        # Diagnostic MIDI pass-through VST3
+    └── midi-transform-vst/     # Relative Interval Transposer plugin
 
 ```
 
 ---
 
-## Prerequisites
+## Quickstart
 
-* **Rust Toolchain:** Install [Rustup](https://rustup.rs/) (targets `x86_64-pc-windows-msvc`).
+### Prerequisites
 
+* **Rust:** `x86_64-pc-windows-msvc` toolchain
+* **Bundler:** `cargo install cargo-nih-plug`
+* **DAW Host:** VST3-compatible host (tested in Ableton Live)
 
-* **DAW Host:**  Any VST3-compatible host. I've only tested the plugin in Ableton Live.
+### Build & Link
 
-
-* **NIH-Plug Bundler:** Install the bundler tool once globally:
-
-
+1. **Build VST3 Bundles:**
 ```bash
-cargo install cargo-nih-plug
-
-```
-
-
-
-
----
-
-## Building the Workspace
-
-### 1. Verify Toolchain (CLI Sanity Check)
-
-Run the standard console binary from your terminal to verify your Rust environment:
-
-```bash
-cargo run -p cli-sanity
-
-```
-
-### 2. Build & Bundle VST3 Plugins
-
-Compile and package the `.vst3` bundles for both plugins:
-
-```bash
-# Build the MIDI Logger
+cargo nih-plug bundle midi-transform-vst
 cargo nih-plug bundle midi-logger-vst
 
-# Build the Relative Interval Transposer
-cargo nih-plug bundle midi-transform-vst
-
-```
-
-The compiled bundles will be generated under `target/bundled/`:
-
-* `target/bundled/midi-logger-vst.vst3`
-
-* `target/bundled/midi-transform-vst.vst3`
-
-
----
-
-## Linking to Ableton / VST3 Directory
-
-To avoid manually copying `.vst3` files after every build, link the build directory to the system VST3 folder (`C:\Program Files\Common Files\VST3\`):
-
-1. Open an **Elevated Command Prompt** (Right-click -> *Run as Administrator*) or an elevated Cygwin session.
-
-
-2. Execute the included batch script:
-
-
-```cmd
-mklink.bat
-
 ```
 
 
-
-This creates directory junctions pointing directly to your compiled build artifacts.
+2. **Link to System VST3 Directory (Windows):**
+Run `mklink.bat` from an elevated Command Prompt or Cygwin session to create junctions pointing to `target/bundled/`.
+3. **In-Place Rebuilds without DAW Restart:**
+Run `./safe-build.sh` to update binary artifacts in place.
 
 ---
 
-## Testing in Ableton Live
+## How It Works
 
-1. Launch **Ableton Live**.
-2. Navigate to **Preferences** $\rightarrow$ **Plug-ins** and click **Rescan**.
+1. **Root Assignment:** Play a single note (e.g., **C3**). The note passes through normally and sets `Root = C3`.
+2. **Interval Step:** While holding **C3**, play an offset note (e.g., **E3**, +4 semitones). Output transposes to **E3**.
+3. **Accumulate:** Re-strike **E3** while holding **C3**. Pitch advances another +4 semitones to **G#3**.
+4. **Reset:** Release all keys to reset state.
 
+---
 
-3. Insert `Relative Interval Transposer` onto a **MIDI Track**.
+## Telemetry & Logging
 
-
-4. Route the MIDI output of this track into a synth instrument track (or place an instrument directly after the MIDI plugin).
-
-
-5. **Play:**
-* Strike **C3** alone $\rightarrow$ Passes through baseline **C3**.
-
-
-* Hold **C3** and hit **E3** (+4 semitones) $\rightarrow$ Outputs **E3**.
-
-
-* Re-strike **E3** while still holding **C3** $\rightarrow$ Step count increments and transposes pitch to **G#3** ($E3 + 4\text{st}$).
-
-
-* Release all keys $\rightarrow$ State machine resets.
-
-
-
-
-
-### Viewing Live Logs
-
-Run **DebugView** (`Dbgview.exe`) with *Capture Win32* enabled to inspect real-time log messages (`[Transposer] Root: ... | Out Pitch: ...`) as you play.
+* **Build Metadata:** Builds automatically embed short Git commit hashes and UTC timestamps via `build.rs`.
+* **Runtime Logs:** Run **DebugView** (`Dbgview.exe`) with *Capture Win32* enabled to view real-time state changes and event logs.

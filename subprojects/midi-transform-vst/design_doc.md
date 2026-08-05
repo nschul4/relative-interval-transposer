@@ -1,121 +1,74 @@
-# System Design Document: Relative Interval Transposer (MIDI FX)
+# Design Document: Relative Interval Transposer
 
-## 1. System Architecture & Toolchain
+## 1. Architecture & Ecosystem
 
-### 1.1 Overview
-
-The project is a cross-platform (Windows-first) MIDI-in / MIDI-out VST3 audio plugin workspace developed in **Rust** using the **NIH-plug** framework.
-
-### 1.2 Development Environment Configuration
-
-* **Primary OS:** Windows 10/11
-* **Target Host / DAW:** Ableton Live (Windows VST3 host)
-* **Debugging & Telemetry:**
-  * **Host & VST3 Instantiation Troubleshooting:** Inspect Ableton's native application diagnostic log at:
-    `%APPDATA%\Ableton\Live <Version>\Preferences\Log.txt`
-    *(Useful for diagnosing issue scenarios where the VST3 fails to scan, crashes on instantiation, or silently rejects being dragged onto a track).*
-* **Realtime Safety:** The processing thread avoids dynamic heap allocations (`HashMap`/`HashSet`). Internal state maps 128 MIDI notes using fixed-size stack arrays.
-
-### 1.3 Build & Deployment Pipeline
-
-* **Cargo Workspaces:** Manages build targets across sanity tests and main plugin crates.
-* **VST3 Bundling:** Handled via `cargo-nih-plug` (`cargo nih-plug bundle <crate_name>`), outputting dynamic link libraries packaged into native `.vst3` directory structures.
-* **DAW Deployment Automation:** Managed via Windows Directory Junctions (`mklink /J`) mapping the target bundle directory directly to the system VST3 folder (`C:\Program Files\Common Files\VST3\...`).
+* **Framework:** NIH-plug (Rust)
+* **Target Architecture:** VST3 (Windows `x86_64-pc-windows-msvc`)
+* **Host Compatibility:** Implements `Instrument` / `Synth` VST3 subcategories and standard 2-channel stereo audio I/O layouts to satisfy track layout negotiation in hosts like Ableton Live.
+* **Real-Time Safety:** Zero heap allocations during `process()`. Internal state tracks 128 MIDI notes via fixed-size stack arrays (`[bool; 128]` and `[Option<u8>; 128]`).
 
 ---
 
-## 2. Cargo Workspace Architecture
+## 2. Workspace Structure
 
 ```text
-my-vst-project/
-├── Cargo.toml                  # Workspace manifest (Resolver v2)
-├── Cargo.lock                  # Lockfile
-├── mklink.bat                  # VST3 directory junction helper
+.
+├── Cargo.toml
+├── mklink.bat
+├── checklink.bat
+├── safe-build.sh
 └── subprojects/
-    ├── cli-sanity/             # Sanity Check 1: Command-line binary
-    ├── midi-logger-vst/        # Sanity Check 2: Pass-through MIDI VST3 logger
-    └── midi-transform-vst/     # Primary Project: Relative Interval Transposer
+    ├── cli-sanity/
+    │   └── src/main.rs
+    ├── midi-logger-vst/
+    │   └── src/lib.rs
+    └── midi-transform-vst/
+        ├── build.rs          # Embeds Git hash & UTC build timestamp
+        └── src/lib.rs        # Core state machine logic
 
 ```
 
 ---
 
-## 3. Core Functional Specification: Relative Interval Transposer
+## 3. Core Logic & State Machine
 
-### 3.1 High-Level Description
+### Internal State
 
-The **Relative Interval Transposer** is a MIDI FX plugin that intercepts incoming MIDI note streams and dynamically transposes pitches based on a user-defined **Root Note** and **Interval Trigger**.
+* `held_notes: [bool; 128]` — Physical keys currently held down.
+* `sounding_pitch: [Option<u8>; 128]` — Active output pitch mapped to physical key index.
+* `root_note: Option<u8>` — Reference root key index.
+* `current_pitch: Option<u8>` — Accumulated pitch baseline.
+* `step_count: i32` — Incremental interval step counter.
 
-### 3.2 State Machine & Behavioral Specification
+### Behavioral Rules
 
-#### State 1: Root Assignment (Single Note Input)
+1. **Single-Note Trigger (Root Assignment):**
+* **Condition:** Active `held_notes` count == 1.
+* **Behavior:** Mutes any remaining sounding pitches across all slots; sets `root_note = note` and `current_pitch = note`; resets `step_count = 0`; passes through baseline note.
 
-* **Trigger:** A single, isolated MIDI `NoteOn` event is received (no other notes held).
+
+2. **Multi-Note Trigger (Interval Transposition):**
+* **Condition:** `root_note` is set and incoming `note != root_note`.
 * **Behavior:**
+* Sends `NoteOff` for active root note and active output pitch on triggering key slot.
+* Calculates interval: $\text{Interval} = \text{Note}_{\text{incoming}} - \text{Root}$
+* Increments accumulator: $\text{Target Pitch} = \text{Clamp}_{0..127}(\text{Pitch}_{\text{current}} + \text{Interval})$
+* Updates state: `current_pitch = Target Pitch`, `step_count += 1`.
+* Emits `NoteOn` for `Target Pitch`.
 
-1. The plugin sets `Root Note = Incoming Pitch`.
-2. The `Current Pitch` is initialized to `Root Note`.
-3. The accumulator `Step Count` is reset to `0`.
-4. The plugin outputs the note at its original pitch.
 
-#### State 2: Accumulative Interval Transposition (Multi-Note Input)
 
-* **Trigger:** Two notes are struck simultaneously or held together, where one note matches `Root Note` and the second note is `Offset Note`.
-* **Behavior:**
 
-1. Calculate interval relative to Root:
+3. **Release & Reset Triggers:**
+* **Single-Key Release:** Sends `NoteOff` for `sounding_pitch` associated with physical key index.
+* **All Keys Released:** Sweeps voice array for orphan notes and clears state (`root_note = None`, `current_pitch = None`, `step_count = 0`).
 
-$$\text{Interval} = \text{Pitch}_{\text{Offset}} - \text{Pitch}_{\text{Root}}$$
 
-2. Increment step count: `Step Count += 1`
-3. Calculate new output pitch additively from `Current Pitch`:
-
-$$\text{Output Pitch} = \text{Current Pitch} + \text{Interval}$$
-
-4. Update state: `Current Pitch = Output Pitch`
-5. Intercept the raw input notes and emit only the newly calculated `Output Pitch`.
 
 ---
 
-### 3.3 Execution Walkthrough
+## 4. Implementation Details
 
-| Step | User Input | Engine State | Math / Calculation | Plugin MIDI Output |
-| --- | --- | --- | --- | --- |
-| **1** | Play **C3 (60)** alone | `Root = 60`, `Current = 60`, `Step = 0` | Baseline | **C3 (60)** |
-| **2** | Play **C3 + E3 (64)** | `Interval = +4`, `Step = 1` | $60 + 4 = 64$ | **E3 (64)** |
-| **3** | Re-strike **E3 (64)** | `Interval = +4`, `Step = 2` | $64 + 4 = 68$ | **G#3 (68)** |
-| **4** | Strike **F3 (65)** while holding **C3** | `Interval = +5`, `Step = 3` | $68 + 5 = 73$ | **C#4 (73)** |
-
----
-
-## 4. Edge Cases & Requirements to Resolve
-
-### 4.1 Accumulator Reset Triggers
-
-The internal step count accumulator and pitch tracking automatically reset under either of the following conditions:
-
-1. **Single Note Trigger (Re-rooting):** Striking any isolated single key resets `Step Count` to `0`, clears active voice mappings, and assigns the new key as `Root Note`.
-2. **All Notes Off Trigger:** Releasing all held keys resets internal tracking state and clears all active voice mappings.
-
-### 4.2 Routing Mode (Interception vs. Polyphony)
-
-* **Mute Original (Interception):** Silences physical keys pressed and outputs *only* the transposed note (Current default implementation).
-* **Pass-Through (Layered):** Outputs original keys *plus* the transposed interval note (Pending parameter UI exposure in `MidiTransformParams`).
-
-### 4.3 Directionality & Pitch Bounds
-
-* **Negative Intervals:** If `Offset Note < Root Note` (e.g., Root = C3, Offset = A2, Interval = -3 st), repeated triggers decrement pitch downward ($A2 \rightarrow F\#2 \rightarrow D2$).
-* **MIDI Bounds Guard:** Output pitches clamp to valid 7-bit MIDI range ($0 \le \text{Pitch} \le 127$).
-
-### Other Key Questions & Edge Cases to Consider
-
-Legato Key Releases (Root Released First):
-If a user holds C3 (Root) and hits E3 (Offset), but then releases C3 while still holding E3, the current code clears held_notes[C3].
-
-Question: Should releasing the root note reset the sequence immediately, or should the active interval state sustain until all keys are released? Currently, the step count stays active until all keys are released, but striking a new note after releasing root will behave as an offset to a root key that is no longer held down.
-
-MIDI Velocity Handling on Step Increments:
-Currently, the velocity of the triggering offset note is passed directly to NoteOn. If the step increments multiple times, should note-off events always use 0.0 velocity (as currently coded), or pass through release velocity if supported?
-
-Cross-Platform Compatibility:
-The workspace includes safe-build.sh (POSIX bash script) alongside Windows batch scripts (.bat). If macOS/Linux support is planned in the future, the directory junction setup (mklink.bat) will need a Unix equivalent (e.g., ln -s script for ~/.vst3).
+* **MIDI Range Guard:** Output pitches clamp strictly within 7-bit MIDI bounds ($0 \le p \le 127$).
+* **Velocity Handling:** Transposed `NoteOn` events inherit input velocity from triggering offset key; `NoteOff` defaults to `0.0`.
+* **Hot-Reloading Helper:** `safe-build.sh` updates compiled `.vst3` target bundles in place to bypass file locking without restarting DAW hosts.
