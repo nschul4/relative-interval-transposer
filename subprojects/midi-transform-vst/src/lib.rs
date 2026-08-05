@@ -4,10 +4,8 @@ use std::sync::Arc;
 
 pub struct MidiTransform {
     params: Arc<MidiTransformParams>,
-    // Track physical keys currently held down (0..127)
     held_notes: [bool; 128],
-    // Maps physical key index -> Active Output Pitch currently sounding on the synth/host
-    sounding_pitch: [Option<u8>; 128],
+    sounding_pitch: [Option<(u8, Option<i32>)>; 128],
     root_note: Option<u8>,
     current_pitch: Option<u8>,
     step_count: i32,
@@ -93,19 +91,16 @@ impl Plugin for MidiTransform {
                 } => {
                     let note_idx = (note & 0x7F) as usize;
                     self.held_notes[note_idx] = true;
-                    let active_count = self.held_notes.iter().filter(|&&h| h).count();
 
-                    // Single key trigger: Resets accumulator and establishes new baseline root note.
-                    if active_count == 1 {
-                        // Send NoteOff for any physical key that was somehow still marked sounding
+                    if self.root_note.is_none() {
                         for p in 0..128 {
-                            if let Some(sounding) = self.sounding_pitch[p].take() {
+                            if let Some((sounding_note, sounding_voice)) = self.sounding_pitch[p].take() {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
-                                    note: sounding,
+                                    note: sounding_note,
                                     velocity: 0.0,
-                                    voice_id: None,
+                                    voice_id: sounding_voice,
                                 });
                             }
                         }
@@ -114,37 +109,35 @@ impl Plugin for MidiTransform {
                         self.current_pitch = Some(note);
                         self.step_count = 0;
 
-                        self.sounding_pitch[note_idx] = Some(note);
+                        self.sounding_pitch[note_idx] = Some((note, voice_id));
                         nih_log!(
-                            "[Transposer] Reset Triggered (Single Note) | New Root: {}",
+                            "[Transposer] Reset Triggered (New Root) | Root: {}",
                             note
                         );
 
                         context.send_event(event);
-                    }
-                    // Multi-note interval trigger (Root key + Offset key)
-                    else if let Some(root) = self.root_note {
+                    } else if let Some(root) = self.root_note {
                         let root_idx = (root & 0x7F) as usize;
                         if note != root {
-                            // Mute baseline root note output if active
-                            if let Some(root_pitch) = self.sounding_pitch[root_idx].take() {
+                            // Mute active root note output
+                            if let Some((root_pitch, root_voice)) = self.sounding_pitch[root_idx].take() {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
                                     note: root_pitch,
                                     velocity: 0.0,
-                                    voice_id: None,
+                                    voice_id: root_voice,
                                 });
                             }
 
-                            // Mute prior output note assigned to this physical offset key
-                            if let Some(prev_pitch) = self.sounding_pitch[note_idx].take() {
+                            // Mute prior note assigned to this physical offset key
+                            if let Some((prev_pitch, prev_voice)) = self.sounding_pitch[note_idx].take() {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
                                     note: prev_pitch,
                                     velocity: 0.0,
-                                    voice_id: None,
+                                    voice_id: prev_voice,
                                 });
                             }
 
@@ -152,18 +145,17 @@ impl Plugin for MidiTransform {
                             let interval = note as i32 - root as i32;
                             self.step_count += 1;
 
-                            // Add interval directly to current accumulator output pitch
                             let base_pitch = self.current_pitch.unwrap_or(root) as i32;
                             let target_pitch = (base_pitch + interval).clamp(0, 127) as u8;
 
                             self.current_pitch = Some(target_pitch);
 
                             nih_log!(
-                                "[Transposer] Root: {} | Interval: {:+} | Step: {} -> Out Pitch: {}", 
+                                "[Transposer] Root: {} | Interval: {:+} | Step: {} -> Out Pitch: {}",
                                 root, interval, self.step_count, target_pitch
                             );
 
-                            self.sounding_pitch[note_idx] = Some(target_pitch);
+                            self.sounding_pitch[note_idx] = Some((target_pitch, voice_id));
 
                             context.send_event(NoteEvent::NoteOn {
                                 timing,
@@ -185,27 +177,25 @@ impl Plugin for MidiTransform {
                     let note_idx = (note & 0x7F) as usize;
                     self.held_notes[note_idx] = false;
 
-                    // 1. Mute whatever pitch this physical key originally triggered
-                    if let Some(sounding_note) = self.sounding_pitch[note_idx].take() {
+                    if let Some((sounding_note, sounding_voice)) = self.sounding_pitch[note_idx].take() {
                         context.send_event(NoteEvent::NoteOff {
                             timing,
                             channel,
                             note: sounding_note,
                             velocity: 0.0,
-                            voice_id: None,
+                            voice_id: sounding_voice,
                         });
                     }
 
-                    // 2. All notes off trigger: Sweep remaining slots to catch orphan voices & reset state
                     if !self.held_notes.iter().any(|&h| h) {
                         for p in 0..128 {
-                            if let Some(sounding) = self.sounding_pitch[p].take() {
+                            if let Some((sounding_note, sounding_voice)) = self.sounding_pitch[p].take() {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
-                                    note: sounding,
+                                    note: sounding_note,
                                     velocity: 0.0,
-                                    voice_id: None,
+                                    voice_id: sounding_voice,
                                 });
                             }
                         }
