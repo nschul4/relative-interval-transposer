@@ -35,7 +35,7 @@ impl Plugin for MidiLogger {
         self.params.clone()
     }
 
-fn process(
+    fn process(
         &mut self,
         _buffer: &mut Buffer, // Added underscore to signal unused variable
         _aux: &mut AuxiliaryBuffers,
@@ -44,14 +44,31 @@ fn process(
         // Loop over incoming MIDI events in the current audio block
         while let Some(event) = context.next_event() {
             match event {
-                NoteEvent::NoteOn { note, velocity, channel, .. } => {
-                    nih_log!("[MIDI In] Note On  | Ch: {} | Note: {} | Vel: {}", channel, note, velocity);
+                NoteEvent::NoteOn {
+                    note,
+                    velocity,
+                    channel,
+                    ..
+                } => {
+                    nih_log!(
+                        "[MIDI In] Note On  | Ch: {} | Note: {} | Vel: {}",
+                        channel,
+                        note,
+                        velocity
+                    );
                 }
                 NoteEvent::NoteOff { note, channel, .. } => {
                     nih_log!("[MIDI In] Note Off | Ch: {} | Note: {}", channel, note);
                 }
-                NoteEvent::MidiCC { cc, value, channel, .. } => {
-                    nih_log!("[MIDI In] CC #{:<3}   | Ch: {} | Val: {}", cc, channel, value);
+                NoteEvent::MidiCC {
+                    cc, value, channel, ..
+                } => {
+                    nih_log!(
+                        "[MIDI In] CC #{:<3}   | Ch: {} | Val: {}",
+                        cc,
+                        channel,
+                        value
+                    );
                 }
                 _ => {}
             }
@@ -66,10 +83,8 @@ fn process(
 
 impl Vst3Plugin for MidiLogger {
     const VST3_CLASS_ID: [u8; 16] = *b"MidiLoggerSanity";
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
-        Vst3SubCategory::Fx,
-        Vst3SubCategory::Tools,
-    ];
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
+        &[Vst3SubCategory::Fx, Vst3SubCategory::Tools];
 }
 
 nih_export_vst3!(MidiLogger);
