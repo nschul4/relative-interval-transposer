@@ -12,7 +12,7 @@ The project is a cross-platform (Windows-first) MIDI-in / MIDI-out VST3 audio pl
 * **Target Host / DAW:** Ableton Live (Windows VST3 host)
 * **Debugging & Telemetry:**
   * **Host & VST3 Instantiation Troubleshooting:** Inspect Ableton's native application diagnostic log at:
-    `C:\Users\austyn\AppData\Roaming\Ableton\Live 11.0.11\Preferences\Log.txt`
+    `%APPDATA%\Ableton\Live <Version>\Preferences\Log.txt`
     *(Useful for diagnosing issue scenarios where the VST3 fails to scan, crashes on instantiation, or silently rejects being dragged onto a track).*
 * **Realtime Safety:** The processing thread avoids dynamic heap allocations (`HashMap`/`HashSet`). Internal state maps 128 MIDI notes using fixed-size stack arrays.
 
@@ -99,8 +99,8 @@ The internal step count accumulator and pitch tracking automatically reset under
 
 ### 4.2 Routing Mode (Interception vs. Polyphony)
 
-* **Mute Original (Interception):** Silences physical keys pressed and outputs *only* the transposed note (Default behavior).
-* **Pass-Through (Layered):** Outputs original keys *plus* the transposed interval note.
+* **Mute Original (Interception):** Silences physical keys pressed and outputs *only* the transposed note (Current default implementation).
+* **Pass-Through (Layered):** Outputs original keys *plus* the transposed interval note (Pending parameter UI exposure in `MidiTransformParams`).
 
 ### 4.3 Directionality & Pitch Bounds
 
