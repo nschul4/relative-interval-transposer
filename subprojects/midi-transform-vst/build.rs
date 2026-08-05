@@ -33,8 +33,10 @@ fn main() {
     println!("cargo:rustc-env=BUILD_TIMESTAMP={}", timestamp);
 
     // Re-run build script when Git state updates
-    println!("cargo:rerun-if-changed=.git/HEAD");
-    println!("cargo:rerun-if-changed=.git/index");
+    if std::path::Path::new("../../.git/HEAD").exists() {
+        println!("cargo:rerun-if-changed=../../.git/HEAD");
+        println!("cargo:rerun-if-changed=../../.git/index");
+    }
 }
 
 fn days_to_date(days_since_epoch: u64) -> (u64, u64, u64) {
