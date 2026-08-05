@@ -82,25 +82,49 @@ impl Plugin for MidiTransform {
     ) -> ProcessStatus {
         while let Some(event) = context.next_event() {
             match event {
-                NoteEvent::NoteOn { note, velocity, channel, timing, voice_id } => {
+                NoteEvent::NoteOn {
+                    note,
+                    velocity,
+                    channel,
+                    timing,
+                    voice_id,
+                } => {
                     let note_idx = (note & 0x7F) as usize;
                     self.held_notes[note_idx] = true;
                     let active_count = self.held_notes.iter().filter(|&&h| h).count();
 
-                    // 1. Single note pressed: Establish Root and Pass-through baseline note
+                    // Single key trigger: Resets accumulator and establishes new baseline root note.
                     if active_count == 1 {
+                        // Send NoteOff for any physical key that was somehow still marked sounding
+                        for p in 0..128 {
+                            if let Some(sounding) = self.sounding_pitch[p].take() {
+                                context.send_event(NoteEvent::NoteOff {
+                                    timing,
+                                    channel,
+                                    note: sounding,
+                                    velocity: 0.0,
+                                    voice_id: None,
+                                });
+                            }
+                        }
+
                         self.root_note = Some(note);
                         self.current_pitch = Some(note);
                         self.step_count = 0;
 
                         self.sounding_pitch[note_idx] = Some(note);
+                        nih_log!(
+                            "[Transposer] Reset Triggered (Single Note) | New Root: {}",
+                            note
+                        );
+
                         context.send_event(event);
-                    } 
-                    // 2. Multi-note interval trigger (Root + Offset Key)
+                    }
+                    // Multi-note interval trigger (Root key + Offset key)
                     else if let Some(root) = self.root_note {
                         let root_idx = (root & 0x7F) as usize;
                         if note != root {
-                            // Silence the Root note if it is currently sounding
+                            // Mute baseline root note output if active
                             if let Some(root_pitch) = self.sounding_pitch[root_idx].take() {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
@@ -111,7 +135,7 @@ impl Plugin for MidiTransform {
                                 });
                             }
 
-                            // Silence any prior transposed note triggered by re-striking this key
+                            // Mute prior output note assigned to this physical offset key
                             if let Some(prev_pitch) = self.sounding_pitch[note_idx].take() {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
@@ -122,20 +146,20 @@ impl Plugin for MidiTransform {
                                 });
                             }
 
-                            // Calculate base interval relative to root key
+                            // Calculate interval relative to root
                             let interval = note as i32 - root as i32;
                             self.step_count += 1;
 
-                            // Accumulator logic: add interval directly to current output pitch
+                            // Add interval directly to current accumulator output pitch
                             let base_pitch = self.current_pitch.unwrap_or(root) as i32;
                             let target_pitch = (base_pitch + interval).clamp(0, 127) as u8;
 
                             self.current_pitch = Some(target_pitch);
 
                             nih_log!(
-                                "[Transposer] Root: {} | Interval: {} | Step: {} -> Out Pitch: {}", 
-                                root, interval, self.step_count, target_pitch
-                            );
+                            "[Transposer] Root: {} | Interval: {:+} | Step: {} -> Out Pitch: {}", 
+                            root, interval, self.step_count, target_pitch
+                        );
 
                             self.sounding_pitch[note_idx] = Some(target_pitch);
 
@@ -150,11 +174,16 @@ impl Plugin for MidiTransform {
                     }
                 }
 
-                NoteEvent::NoteOff { note, channel, timing, .. } => {
+                NoteEvent::NoteOff {
+                    note,
+                    channel,
+                    timing,
+                    ..
+                } => {
                     let note_idx = (note & 0x7F) as usize;
                     self.held_notes[note_idx] = false;
 
-                    // Send NoteOff for whatever target pitch this physical key originally triggered
+                    // Mute whatever pitch this physical key originally triggered
                     if let Some(sounding_note) = self.sounding_pitch[note_idx].take() {
                         context.send_event(NoteEvent::NoteOff {
                             timing,
@@ -165,12 +194,13 @@ impl Plugin for MidiTransform {
                         });
                     }
 
-                    // Reset root tracking and state if all keys have been released
+                    // All notes off trigger: Reset tracking state when all keys are released
                     if !self.held_notes.iter().any(|&h| h) {
                         self.root_note = None;
                         self.current_pitch = None;
                         self.step_count = 0;
                         self.sounding_pitch = [None; 128];
+                        nih_log!("[Transposer] Reset Triggered (All Notes Released)");
                     }
                 }
 
@@ -186,13 +216,11 @@ impl Plugin for MidiTransform {
 
 impl Vst3Plugin for MidiTransform {
     const VST3_CLASS_ID: [u8; 16] = [
-        0x4B, 0x93, 0xA2, 0x11, 0x58, 0xE1, 0x4F, 0x82,
-        0xB0, 0x33, 0x61, 0x98, 0xC4, 0xD2, 0xE3, 0x01,
+        0x4B, 0x93, 0xA2, 0x11, 0x58, 0xE1, 0x4F, 0x82, 0xB0, 0x33, 0x61, 0x98, 0xC4, 0xD2, 0xE3,
+        0x01,
     ];
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
-        Vst3SubCategory::Instrument,
-        Vst3SubCategory::Synth,
-    ];
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
+        &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth];
 }
 
 nih_export_vst3!(MidiTransform);
