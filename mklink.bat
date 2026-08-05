@@ -5,5 +5,5 @@ REM Administrator privileges. Please run this script in an elevated Command Prom
 REM (Right-click -> "Run as administrator") or from an elevated Cygwin session.
 REM ==============================================================================
 
-mklink /J "C:\Program Files\Common Files\VST3\neal\midi-logger-vst.vst3" "E:\dev\my-vst-project\target\bundled\midi-logger-vst.vst3"
-mklink /J "C:\Program Files\Common Files\VST3\neal\midi-transform-vst.vst3" "E:\dev\my-vst-project\target\bundled\midi-transform-vst.vst3"
+mklink /J "C:\Program Files\Common Files\VST3\neal\midi-logger-vst.vst3" "%~dp0target\bundled\midi-logger-vst.vst3"
+mklink /J "C:\Program Files\Common Files\VST3\neal\midi-transform-vst.vst3" "%~dp0target\bundled\midi-transform-vst.vst3"

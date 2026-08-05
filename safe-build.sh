@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Navigate to script root directory
+cd "$(dirname "$0")" || exit 1
+
 # 1. Compile the VST3 library target
 cargo build -p midi-transform-vst || exit 1
 

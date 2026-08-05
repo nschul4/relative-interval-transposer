@@ -1,5 +1,5 @@
 @echo off
-set "LOG_PATH=E:\dev\my-vst-project\tmp_nih_log.txt"
+set "LOG_PATH=%~dp0tmp_nih_log.txt"
 
 :: Set system-wide environment variable
 setx NIH_LOG "%LOG_PATH%" > nul
