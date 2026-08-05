@@ -36,7 +36,7 @@ impl Plugin for MidiTransform {
     const EMAIL: &'static str = "";
     const VERSION: &'static str = "0.1.0";
 
-    // Standard stereo audio I/O layout required for Ableton Live track instantiation
+    // Standard stereo audio layout required for Ableton Live track bus negotiation
     const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
         AudioIOLayout {
             main_input_channels: NonZeroU32::new(2),
@@ -67,9 +67,11 @@ impl Plugin for MidiTransform {
         _context: &mut impl InitContext<Self>,
     ) -> bool {
         nih_log!(
-            "[Transposer] Instantiated {} v{}",
+            "[Transposer] Instantiated {} v{} (Build: {} | Time: {})",
             env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION")
+            env!("CARGO_PKG_VERSION"),
+            env!("BUILD_GIT_HASH"),
+            env!("BUILD_TIMESTAMP")
         );
         true
     }
@@ -157,9 +159,9 @@ impl Plugin for MidiTransform {
                             self.current_pitch = Some(target_pitch);
 
                             nih_log!(
-                            "[Transposer] Root: {} | Interval: {:+} | Step: {} -> Out Pitch: {}", 
-                            root, interval, self.step_count, target_pitch
-                        );
+                                "[Transposer] Root: {} | Interval: {:+} | Step: {} -> Out Pitch: {}", 
+                                root, interval, self.step_count, target_pitch
+                            );
 
                             self.sounding_pitch[note_idx] = Some(target_pitch);
 
@@ -183,7 +185,7 @@ impl Plugin for MidiTransform {
                     let note_idx = (note & 0x7F) as usize;
                     self.held_notes[note_idx] = false;
 
-                    // Mute whatever pitch this physical key originally triggered
+                    // 1. Mute whatever pitch this physical key originally triggered
                     if let Some(sounding_note) = self.sounding_pitch[note_idx].take() {
                         context.send_event(NoteEvent::NoteOff {
                             timing,
@@ -194,12 +196,23 @@ impl Plugin for MidiTransform {
                         });
                     }
 
-                    // All notes off trigger: Reset tracking state when all keys are released
+                    // 2. All notes off trigger: Sweep remaining slots to catch orphan voices & reset state
                     if !self.held_notes.iter().any(|&h| h) {
+                        for p in 0..128 {
+                            if let Some(sounding) = self.sounding_pitch[p].take() {
+                                context.send_event(NoteEvent::NoteOff {
+                                    timing,
+                                    channel,
+                                    note: sounding,
+                                    velocity: 0.0,
+                                    voice_id: None,
+                                });
+                            }
+                        }
+
                         self.root_note = None;
                         self.current_pitch = None;
                         self.step_count = 0;
-                        self.sounding_pitch = [None; 128];
                         nih_log!("[Transposer] Reset Triggered (All Notes Released)");
                     }
                 }
