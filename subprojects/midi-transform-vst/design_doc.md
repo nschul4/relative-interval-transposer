@@ -106,3 +106,16 @@ The internal step count accumulator and pitch tracking automatically reset under
 
 * **Negative Intervals:** If `Offset Note < Root Note` (e.g., Root = C3, Offset = A2, Interval = -3 st), repeated triggers decrement pitch downward ($A2 \rightarrow F\#2 \rightarrow D2$).
 * **MIDI Bounds Guard:** Output pitches clamp to valid 7-bit MIDI range ($0 \le \text{Pitch} \le 127$).
+
+### Other Key Questions & Edge Cases to Consider
+
+Legato Key Releases (Root Released First):
+If a user holds C3 (Root) and hits E3 (Offset), but then releases C3 while still holding E3, the current code clears held_notes[C3].
+
+Question: Should releasing the root note reset the sequence immediately, or should the active interval state sustain until all keys are released? Currently, the step count stays active until all keys are released, but striking a new note after releasing root will behave as an offset to a root key that is no longer held down.
+
+MIDI Velocity Handling on Step Increments:
+Currently, the velocity of the triggering offset note is passed directly to NoteOn. If the step increments multiple times, should note-off events always use 0.0 velocity (as currently coded), or pass through release velocity if supported?
+
+Cross-Platform Compatibility:
+The workspace includes safe-build.sh (POSIX bash script) alongside Windows batch scripts (.bat). If macOS/Linux support is planned in the future, the directory junction setup (mklink.bat) will need a Unix equivalent (e.g., ln -s script for ~/.vst3).
