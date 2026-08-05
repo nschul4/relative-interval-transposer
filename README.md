@@ -1,8 +1,8 @@
 # Relative Interval Transposer (MIDI FX)
 
-A cross-platform (Windows-first) VST3 MIDI plugin workspace built in **Rust** using the **NIH-plug** framework.
+A VST3 MIDI plugin workspace built in **Rust** using the **NIH-plug** framework.
 
-This project intercepts incoming MIDI note streams and dynamically transposes pitches based on a user-defined **Root Note** and **Interval Trigger**. Holding a root key while striking an offset key calculates the musical interval and steps the transposition outward on subsequent hits, providing an expressive tool for live performance and algorithmic composition.
+This project builds a VST that intercepts incoming MIDI note streams and dynamically transposes pitches based on a user-defined **Root Note** and **Interval Trigger**. Holding a root key while striking an offset key calculates the musical interval and steps the transposition outward on subsequent hits, providing an expressive tool for live performance and algorithmic composition.
 
 ---
 
@@ -28,10 +28,7 @@ The repository is structured as a **Cargo Workspace** containing both sanity-che
 * **Rust Toolchain:** Install [Rustup](https://rustup.rs/) (targets `x86_64-pc-windows-msvc`).
 
 
-* **Terminal Shell:** Cygwin (Bash) or Windows Command Prompt / PowerShell.
-
-
-* **DAW Host:** Ableton Live (or any VST3-compatible host).
+* **DAW Host:**  Any VST3-compatible host. I've only tested the plugin in Ableton Live.
 
 
 * **NIH-Plug Bundler:** Install the bundler tool once globally:
@@ -42,8 +39,6 @@ cargo install cargo-nih-plug
 
 ```
 
-
-* **(Optional) Microsoft DebugView:** To monitor live `nih_log!` output in real-time (`Dbgview.exe`).
 
 
 

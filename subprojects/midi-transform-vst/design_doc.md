@@ -9,14 +9,11 @@ The project is a cross-platform (Windows-first) MIDI-in / MIDI-out VST3 audio pl
 ### 1.2 Development Environment Configuration
 
 * **Primary OS:** Windows 10/11
-* **Terminal Environment:** Cygwin (Bash) driving native Windows/Rust toolchains (`x86_64-pc-windows-msvc`)
-* **IDE / Editor:** Visual Studio Code
 * **Target Host / DAW:** Ableton Live (Windows VST3 host)
 * **Debugging & Telemetry:**
-  * **Realtime Plugin State & Logic:** Logged via `nih_log!` and monitored using Microsoft DebugView (`Dbgview.exe` / `dbgviewcli64.exe`) or written directly to file via `NIH_LOG`.
   * **Host & VST3 Instantiation Troubleshooting:** Inspect Ableton's native application diagnostic log at:
     `C:\Users\austyn\AppData\Roaming\Ableton\Live 11.0.11\Preferences\Log.txt`
-    *(Crucial for diagnosing issue scenarios where the VST3 fails to scan, crashes on instantiation, or silently rejects being dragged onto a track).*
+    *(Useful for diagnosing issue scenarios where the VST3 fails to scan, crashes on instantiation, or silently rejects being dragged onto a track).*
 * **Realtime Safety:** The processing thread avoids dynamic heap allocations (`HashMap`/`HashSet`). Internal state maps 128 MIDI notes using fixed-size stack arrays.
 
 ### 1.3 Build & Deployment Pipeline
@@ -95,8 +92,10 @@ $$\text{Output Pitch} = \text{Current Pitch} + \text{Interval}$$
 
 ### 4.1 Accumulator Reset Triggers
 
-* **Option A (New Single Note):** Striking any single new note clears `Step Count` to 0 and replaces `Root Note`.
-* **Option B (Timeout / All Notes Off):** Releasing all keys resets internal state tracking.
+The internal step count accumulator and pitch tracking automatically reset under either of the following conditions:
+
+1. **Single Note Trigger (Re-rooting):** Striking any isolated single key resets `Step Count` to `0`, clears active voice mappings, and assigns the new key as `Root Note`.
+2. **All Notes Off Trigger:** Releasing all held keys resets internal tracking state and clears all active voice mappings.
 
 ### 4.2 Routing Mode (Interception vs. Polyphony)
 
