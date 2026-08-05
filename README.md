@@ -1,4 +1,4 @@
-# Relative Interval Transposer
+# relative-interval-transposer
 
 A VST3 MIDI plugin workspace built in Rust using the [NIH-plug](https://github.com/robbert-vdh/nih-plug) framework.
 
@@ -9,7 +9,7 @@ The primary plugin intercepts incoming MIDI notes and dynamically transposes pit
 ## Workspace Layout
 
 ```text
-.
+relative-interval-transposer/
 ├── Cargo.toml                  # Workspace manifest
 ├── mklink.bat                  # Windows VST3 directory junction helper
 ├── checklink.bat               # VST3 junction verification helper
