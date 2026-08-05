@@ -94,7 +94,9 @@ impl Plugin for MidiTransform {
 
                     if self.root_note.is_none() {
                         for p in 0..128 {
-                            if let Some((sounding_note, sounding_voice)) = self.sounding_pitch[p].take() {
+                            if let Some((sounding_note, sounding_voice)) =
+                                self.sounding_pitch[p].take()
+                            {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
@@ -110,17 +112,16 @@ impl Plugin for MidiTransform {
                         self.step_count = 0;
 
                         self.sounding_pitch[note_idx] = Some((note, voice_id));
-                        nih_log!(
-                            "[Transposer] Reset Triggered (New Root) | Root: {}",
-                            note
-                        );
+                        nih_log!("[Transposer] Reset Triggered (New Root) | Root: {}", note);
 
                         context.send_event(event);
                     } else if let Some(root) = self.root_note {
                         let root_idx = (root & 0x7F) as usize;
                         if note != root {
                             // Mute active root note output
-                            if let Some((root_pitch, root_voice)) = self.sounding_pitch[root_idx].take() {
+                            if let Some((root_pitch, root_voice)) =
+                                self.sounding_pitch[root_idx].take()
+                            {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
@@ -131,7 +132,9 @@ impl Plugin for MidiTransform {
                             }
 
                             // Mute prior note assigned to this physical offset key
-                            if let Some((prev_pitch, prev_voice)) = self.sounding_pitch[note_idx].take() {
+                            if let Some((prev_pitch, prev_voice)) =
+                                self.sounding_pitch[note_idx].take()
+                            {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
@@ -177,7 +180,9 @@ impl Plugin for MidiTransform {
                     let note_idx = (note & 0x7F) as usize;
                     self.held_notes[note_idx] = false;
 
-                    if let Some((sounding_note, sounding_voice)) = self.sounding_pitch[note_idx].take() {
+                    if let Some((sounding_note, sounding_voice)) =
+                        self.sounding_pitch[note_idx].take()
+                    {
                         context.send_event(NoteEvent::NoteOff {
                             timing,
                             channel,
@@ -189,7 +194,9 @@ impl Plugin for MidiTransform {
 
                     if !self.held_notes.iter().any(|&h| h) {
                         for p in 0..128 {
-                            if let Some((sounding_note, sounding_voice)) = self.sounding_pitch[p].take() {
+                            if let Some((sounding_note, sounding_voice)) =
+                                self.sounding_pitch[p].take()
+                            {
                                 context.send_event(NoteEvent::NoteOff {
                                     timing,
                                     channel,
