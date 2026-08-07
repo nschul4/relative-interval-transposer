@@ -27,6 +27,14 @@ impl Default for MidiTransform {
     }
 }
 
+impl MidiTransform {
+    #[inline(always)]
+    fn log_event(&self, message: std::fmt::Arguments) {
+        // Toggle this line to disable/enable logging
+        nih_log!("{}", message);
+    }
+}
+
 impl Plugin for MidiTransform {
     const NAME: &'static str = "Relative Interval Transposer";
     const VENDOR: &'static str = "Neal";
@@ -64,13 +72,13 @@ impl Plugin for MidiTransform {
         _buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
-        nih_log!(
+        self.log_event(format_args!(
             "[Transposer] Instantiated {} v{} (Build: {} | Time: {})",
             env!("CARGO_PKG_NAME"),
             env!("CARGO_PKG_VERSION"),
             env!("BUILD_GIT_HASH"),
             env!("BUILD_TIMESTAMP")
-        );
+        ));
         true
     }
 
@@ -112,7 +120,10 @@ impl Plugin for MidiTransform {
                         self.step_count = 0;
 
                         self.sounding_pitch[note_idx] = Some((note, voice_id));
-                        nih_log!("[Transposer] Reset Triggered (New Root) | Root: {}", note);
+                        self.log_event(format_args!(
+                            "[Transposer] Reset Triggered (New Root) | Root: {}",
+                            note
+                        ));
 
                         context.send_event(event);
                     } else if let Some(root) = self.root_note {
@@ -153,10 +164,10 @@ impl Plugin for MidiTransform {
 
                             self.current_pitch = Some(target_pitch);
 
-                            nih_log!(
+                            self.log_event(format_args!(
                                 "[Transposer] Root: {} | Interval: {:+} | Step: {} -> Out Pitch: {}",
                                 root, interval, self.step_count, target_pitch
-                            );
+                            ));
 
                             self.sounding_pitch[note_idx] = Some((target_pitch, voice_id));
 
@@ -210,7 +221,9 @@ impl Plugin for MidiTransform {
                         self.root_note = None;
                         self.current_pitch = None;
                         self.step_count = 0;
-                        nih_log!("[Transposer] Reset Triggered (All Notes Released)");
+                        self.log_event(format_args!(
+                            "[Transposer] Reset Triggered (All Notes Released)"
+                        ));
                     }
                 }
 

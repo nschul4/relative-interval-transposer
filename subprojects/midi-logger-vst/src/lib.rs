@@ -16,6 +16,14 @@ impl Default for MidiLogger {
     }
 }
 
+impl MidiLogger {
+    #[inline(always)]
+    fn log_event(&self, message: std::fmt::Arguments) {
+        // Toggle this line (or condition on debug flags) to disable/enable logging
+        nih_log!("{}", message);
+    }
+}
+
 impl Plugin for MidiLogger {
     const NAME: &'static str = "MIDI Logger";
     const VENDOR: &'static str = "Neal";
@@ -46,13 +54,13 @@ impl Plugin for MidiLogger {
         _buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
-        nih_log!(
+        self.log_event(format_args!(
             "[MIDI Logger] Instantiated {} v{} (Build: {} | Time: {})",
             env!("CARGO_PKG_NAME"),
             env!("CARGO_PKG_VERSION"),
             env!("BUILD_GIT_HASH"),
             env!("BUILD_TIMESTAMP")
-        );
+        ));
         true
     }
 
@@ -71,25 +79,24 @@ impl Plugin for MidiLogger {
                     channel,
                     ..
                 } => {
-                    nih_log!(
+                    self.log_event(format_args!(
                         "[MIDI Logger] Note On  | Ch: {} | Note: {} | Vel: {}",
-                        channel,
-                        note,
-                        velocity
-                    );
+                        channel, note, velocity
+                    ));
                 }
                 NoteEvent::NoteOff { note, channel, .. } => {
-                    nih_log!("[MIDI Logger] Note Off | Ch: {} | Note: {}", channel, note);
+                    self.log_event(format_args!(
+                        "[MIDI Logger] Note Off | Ch: {} | Note: {}",
+                        channel, note
+                    ));
                 }
                 NoteEvent::MidiCC {
                     cc, value, channel, ..
                 } => {
-                    nih_log!(
+                    self.log_event(format_args!(
                         "[MIDI In] CC #{:<3}   | Ch: {} | Val: {}",
-                        cc,
-                        channel,
-                        value
-                    );
+                        cc, channel, value
+                    ));
                 }
                 _ => {}
             }
