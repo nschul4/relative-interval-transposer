@@ -225,10 +225,7 @@ impl Plugin for MidiTransform {
 }
 
 impl Vst3Plugin for MidiTransform {
-    const VST3_CLASS_ID: [u8; 16] = [
-        0x4B, 0x93, 0xA2, 0x11, 0x58, 0xE1, 0x4F, 0x82, 0xB0, 0x33, 0x61, 0x98, 0xC4, 0xD2, 0xE3,
-        0x01,
-    ];
+    const VST3_CLASS_ID: [u8; 16] = *b"MidiRelativeTran";
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
         &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth];
 }
