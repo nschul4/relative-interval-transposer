@@ -25,7 +25,7 @@ jobs:
           targets: x86_64-pc-windows-msvc
 
       - name: Install Cargo NIH-plug Bundler
-        run: cargo install cargo-nih-plug
+        run: cargo install --git https://github.com/robbert-vdh/nih-plug.git cargo-nih-plug
 
       - name: Build VST3 Bundles
         run: |
