@@ -42,7 +42,7 @@ Run `./build.sh` to update binary artifacts in place.
 
 ## Telemetry & Logging
 
-* **Build Metadata:** Builds automatically embed short Git commit hashes and UTC timestamps via `build.rs`.
+* **Build Metadata:** Builds automatically embed short Git commit hashes and UTC timestamps via `build_common.rs`.
 * **Runtime Logs:** Run **DebugView** (`Dbgview.exe`) with *Capture Win32* enabled to view real-time state changes and event logs.
 
 ---

@@ -1,3 +1,4 @@
+// ./build_common.rs
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -32,10 +33,15 @@ fn main() {
     println!("cargo:rustc-env=BUILD_GIT_HASH={}", git_hash);
     println!("cargo:rustc-env=BUILD_TIMESTAMP={}", timestamp);
 
-    // Re-run build script when Git state updates
-    if std::path::Path::new("../../.git/HEAD").exists() {
-        println!("cargo:rerun-if-changed=../../.git/HEAD");
-        println!("cargo:rerun-if-changed=../../.git/index");
+    // Since the crates are in `subprojects/<name>`, `../../.git` works,
+    // but checking `.git` relative to CARGO_MANIFEST_DIR is cleaner:
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+    let git_head = std::path::Path::new(&manifest_dir).join("../../.git/HEAD");
+    let git_index = std::path::Path::new(&manifest_dir).join("../../.git/index");
+
+    if git_head.exists() {
+        println!("cargo:rerun-if-changed={}", git_head.display());
+        println!("cargo:rerun-if-changed={}", git_index.display());
     }
 }
 
