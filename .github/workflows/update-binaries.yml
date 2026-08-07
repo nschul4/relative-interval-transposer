@@ -1,0 +1,45 @@
+name: Update Windows Binaries
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'subprojects/**'
+      - 'Cargo.toml'
+      - '.github/workflows/update-binaries.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-commit:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install Cargo NIH-plug Bundler
+        run: cargo install cargo-nih-plug
+
+      - name: Build VST3 Bundles
+        run: |
+          cargo nih-plug bundle midi-transform-vst
+          cargo nih-plug bundle midi-logger-vst
+
+      - name: Prepare Releases Directory
+        run: |
+          if (!(Test-Path "releases")) { New-Item -ItemType Directory -Path "releases" }
+          Compress-Archive -Path "target/bundled/midi-transform-vst.vst3" -DestinationPath "releases/midi-transform-vst-windows.zip" -Force
+          Compress-Archive -Path "target/bundled/midi-logger-vst.vst3" -DestinationPath "releases/midi-logger-vst-windows.zip" -Force
+
+      - name: Commit and Push Binaries
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update pre-compiled Windows VST3 binaries [skip ci]"
+          file_pattern: "releases/*.zip"

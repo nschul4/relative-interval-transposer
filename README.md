@@ -44,3 +44,17 @@ Run `./safe-build.sh` to update binary artifacts in place.
 
 * **Build Metadata:** Builds automatically embed short Git commit hashes and UTC timestamps via `build.rs`.
 * **Runtime Logs:** Run **DebugView** (`Dbgview.exe`) with *Capture Win32* enabled to view real-time state changes and event logs.
+
+---
+
+## Pre-Compiled Binaries (`releases/`)
+
+For users who want to run the plugins without installing the Rust toolchain, pre-compiled Windows VST3 binaries are bundled as `.zip` archives inside the [`releases/`](./releases) directory:
+
+* [`midi-transform-vst-windows.zip`](./releases/midi-transform-vst-windows.zip)
+* [`midi-logger-vst-windows.zip`](./releases/midi-logger-vst-windows.zip)
+
+### Installation from Binaries
+1. Download the desired `.zip` file from the `releases/` folder.
+2. Extract the contents (`.vst3` bundle directory) into your system VST3 plugin folder:
+   * **Default Windows Path:** `C:\Program Files\Common Files\VST3\`
