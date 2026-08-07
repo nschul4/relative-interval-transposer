@@ -47,6 +47,22 @@ impl Plugin for MidiLogger {
         self.params.clone()
     }
 
+    fn initialize(
+        &mut self,
+        _audio_config: &AudioIOLayout,
+        _buffer_config: &BufferConfig,
+        _context: &mut impl InitContext<Self>,
+    ) -> bool {
+        nih_log!(
+            "[MIDI Logger] Instantiated {} v{} (Build: {} | Time: {})",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+            env!("BUILD_GIT_HASH"),
+            env!("BUILD_TIMESTAMP")
+        );
+        true
+    }
+
     fn process(
         &mut self,
         _buffer: &mut Buffer, // Added underscore to signal unused variable
@@ -63,14 +79,14 @@ impl Plugin for MidiLogger {
                     ..
                 } => {
                     nih_log!(
-                        "[MIDI In] Note On  | Ch: {} | Note: {} | Vel: {}",
+                        "[MIDI Logger] Note On  | Ch: {} | Note: {} | Vel: {}",
                         channel,
                         note,
                         velocity
                     );
                 }
                 NoteEvent::NoteOff { note, channel, .. } => {
-                    nih_log!("[MIDI In] Note Off | Ch: {} | Note: {}", channel, note);
+                    nih_log!("[MIDI Logger] Note Off | Ch: {} | Note: {}", channel, note);
                 }
                 NoteEvent::MidiCC {
                     cc, value, channel, ..
