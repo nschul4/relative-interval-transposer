@@ -6,23 +6,6 @@ The primary plugin intercepts incoming MIDI notes and dynamically transposes pit
 
 ---
 
-## Workspace Layout
-
-```text
-relative-interval-transposer/
-├── Cargo.toml                  # Workspace manifest
-├── mklink.bat                  # Windows VST3 directory junction helper
-├── checklink.bat               # VST3 junction verification helper
-├── safe-build.sh               # In-place VST3 bundle update script
-└── subprojects/
-    ├── cli-sanity/             # Toolchain verification CLI
-    ├── midi-logger-vst/        # Diagnostic MIDI pass-through VST3
-    └── midi-transform-vst/     # Relative Interval Transposer plugin
-
-```
-
----
-
 ## Quickstart
 
 ### Prerequisites

@@ -9,27 +9,6 @@
 
 ---
 
-## 2. Workspace Structure
-
-```text
-.
-├── Cargo.toml
-├── mklink.bat
-├── checklink.bat
-├── safe-build.sh
-└── subprojects/
-    ├── cli-sanity/
-    │   └── src/main.rs
-    ├── midi-logger-vst/
-    │   └── src/lib.rs
-    └── midi-transform-vst/
-        ├── build.rs          # Embeds Git hash & UTC build timestamp
-        └── src/lib.rs        # Core state machine logic
-
-```
-
----
-
 ## 3. Core Logic & State Machine
 
 ### Internal State
