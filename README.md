@@ -27,7 +27,7 @@ cargo nih-plug bundle midi-logger-vst
 2. **Link to System VST3 Directory (Windows):**
 Run `mklink.bat` from an elevated Command Prompt or Cygwin session to create junctions pointing to `target/bundled/`.
 3. **In-Place Rebuilds without DAW Restart:**
-Run `./safe-build.sh` to update binary artifacts in place.
+Run `./build.sh` to update binary artifacts in place.
 
 ---
 
