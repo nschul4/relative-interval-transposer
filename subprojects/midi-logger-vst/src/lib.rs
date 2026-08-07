@@ -24,17 +24,11 @@ impl Plugin for MidiLogger {
     const VERSION: &'static str = "0.1.0";
 
     // Inform host that this plugin accepts and passes MIDI
-    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
-        AudioIOLayout {
-            main_input_channels: NonZeroU32::new(2),
-            main_output_channels: NonZeroU32::new(2),
-            ..AudioIOLayout::const_default()
-        },
-        AudioIOLayout {
-            main_input_channels: None,
-            main_output_channels: NonZeroU32::new(2),
-            ..AudioIOLayout::const_default()
-        },
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
+        main_input_channels: None,
+        main_output_channels: NonZeroU32::new(2),
+        ..AudioIOLayout::const_default()
+    },
     ];
 
     const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
@@ -112,7 +106,7 @@ impl Plugin for MidiLogger {
 impl Vst3Plugin for MidiLogger {
     const VST3_CLASS_ID: [u8; 16] = *b"MidiLoggerSanity";
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] =
-        &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth];
+        &[Vst3SubCategory::Instrument];
 }
 
 nih_export_vst3!(MidiLogger);
