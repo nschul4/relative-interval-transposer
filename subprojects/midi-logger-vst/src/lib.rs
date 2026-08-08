@@ -1,8 +1,24 @@
+mod engine;
+
+use engine::LoggerEngine;
+use midi_core::{
+    domain_to_nih, nih_to_domain, Logger, DEFAULT_INSTRUMENT_LAYOUTS, DEFAULT_MIDI_INPUT,
+    DEFAULT_MIDI_OUTPUT,
+};
 use nih_plug::prelude::*;
 use std::sync::Arc;
 
+struct NihLogger;
+impl Logger for NihLogger {
+    #[inline(always)]
+    fn log(&self, _message: std::fmt::Arguments) {
+        nih_log!("{}", _message);
+    }
+}
+
 pub struct MidiLogger {
     params: Arc<MidiLoggerParams>,
+    engine: LoggerEngine<NihLogger>,
 }
 
 #[derive(Params)]
@@ -12,15 +28,8 @@ impl Default for MidiLogger {
     fn default() -> Self {
         Self {
             params: Arc::new(MidiLoggerParams {}),
+            engine: LoggerEngine::new(NihLogger),
         }
-    }
-}
-
-impl MidiLogger {
-    #[inline(always)]
-    fn log_event(&self, message: std::fmt::Arguments) {
-        // Toggle this line (or condition on debug flags) to disable/enable logging
-        nih_log!("{}", message);
     }
 }
 
@@ -31,15 +40,10 @@ impl Plugin for MidiLogger {
     const EMAIL: &'static str = "";
     const VERSION: &'static str = "0.1.0";
 
-    // Inform host that this plugin accepts and passes MIDI
-    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
-        main_input_channels: None,
-        main_output_channels: NonZeroU32::new(2),
-        ..AudioIOLayout::const_default()
-    }];
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = DEFAULT_INSTRUMENT_LAYOUTS;
 
-    const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
-    const MIDI_OUTPUT: MidiConfig = MidiConfig::MidiCCs;
+    const MIDI_INPUT: MidiConfig = DEFAULT_MIDI_INPUT;
+    const MIDI_OUTPUT: MidiConfig = DEFAULT_MIDI_OUTPUT;
 
     type SysExMessage = ();
     type BackgroundTask = ();
@@ -54,7 +58,7 @@ impl Plugin for MidiLogger {
         _buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
-        self.log_event(format_args!(
+        NihLogger.log(format_args!(
             "[MIDI Logger] Instantiated {} v{} (Build: {} | Time: {})",
             env!("CARGO_PKG_NAME"),
             env!("CARGO_PKG_VERSION"),
@@ -66,43 +70,20 @@ impl Plugin for MidiLogger {
 
     fn process(
         &mut self,
-        _buffer: &mut Buffer, // Added underscore to signal unused variable
+        _buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
-        // Loop over incoming MIDI events in the current audio block
         while let Some(event) = context.next_event() {
-            match event {
-                NoteEvent::NoteOn {
-                    note,
-                    velocity,
-                    channel,
-                    ..
-                } => {
-                    self.log_event(format_args!(
-                        "[MIDI Logger] Note On  | Ch: {} | Note: {} | Vel: {}",
-                        channel, note, velocity
-                    ));
-                }
-                NoteEvent::NoteOff { note, channel, .. } => {
-                    self.log_event(format_args!(
-                        "[MIDI Logger] Note Off | Ch: {} | Note: {}",
-                        channel, note
-                    ));
-                }
-                NoteEvent::MidiCC {
-                    cc, value, channel, ..
-                } => {
-                    self.log_event(format_args!(
-                        "[MIDI In] CC #{:<3}   | Ch: {} | Val: {}",
-                        cc, channel, value
-                    ));
-                }
-                _ => {}
+            if let Some(domain_evt) = nih_to_domain(&event) {
+                self.engine.handle_event(domain_evt, |out_domain_evt| {
+                    if let Some(out_nih_evt) = domain_to_nih(out_domain_evt) {
+                        context.send_event(out_nih_evt);
+                    }
+                });
+            } else {
+                context.send_event(event);
             }
-
-            // Passthrough MIDI event to output buffer
-            context.send_event(event);
         }
 
         ProcessStatus::Normal

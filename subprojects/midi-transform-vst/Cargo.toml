@@ -8,4 +8,5 @@ build = "../../build_common.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
+midi-core = { path = "../midi-core" }
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git" }

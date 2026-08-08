@@ -1,4 +1,3 @@
-// ./build_common.rs
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 

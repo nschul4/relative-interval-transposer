@@ -1,14 +1,24 @@
+mod engine;
+
+use engine::TransposerEngine;
+use midi_core::{
+    domain_to_nih, nih_to_domain, Logger, DEFAULT_INSTRUMENT_LAYOUTS, DEFAULT_MIDI_INPUT,
+    DEFAULT_MIDI_OUTPUT,
+};
 use nih_plug::prelude::*;
-use std::num::NonZeroU32;
 use std::sync::Arc;
+
+struct NihLogger;
+impl Logger for NihLogger {
+    #[inline(always)]
+    fn log(&self, _message: std::fmt::Arguments) {
+        nih_log!("{}", _message);
+    }
+}
 
 pub struct MidiTransform {
     params: Arc<MidiTransformParams>,
-    held_notes: [bool; 128],
-    sounding_pitch: [Option<(u8, Option<i32>)>; 128],
-    root_note: Option<u8>,
-    current_pitch: Option<u8>,
-    step_count: i32,
+    engine: TransposerEngine<NihLogger>,
 }
 
 #[derive(Params)]
@@ -18,20 +28,8 @@ impl Default for MidiTransform {
     fn default() -> Self {
         Self {
             params: Arc::new(MidiTransformParams {}),
-            held_notes: [false; 128],
-            sounding_pitch: [None; 128],
-            root_note: None,
-            current_pitch: None,
-            step_count: 0,
+            engine: TransposerEngine::new(NihLogger),
         }
-    }
-}
-
-impl MidiTransform {
-    #[inline(always)]
-    fn log_event(&self, message: std::fmt::Arguments) {
-        // Toggle this line to disable/enable logging
-        nih_log!("{}", message);
     }
 }
 
@@ -42,22 +40,10 @@ impl Plugin for MidiTransform {
     const EMAIL: &'static str = "";
     const VERSION: &'static str = "0.1.0";
 
-    // Standard stereo audio layout required for Ableton Live track bus negotiation
-    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
-        AudioIOLayout {
-            main_input_channels: NonZeroU32::new(2),
-            main_output_channels: NonZeroU32::new(2),
-            ..AudioIOLayout::const_default()
-        },
-        AudioIOLayout {
-            main_input_channels: None,
-            main_output_channels: NonZeroU32::new(2),
-            ..AudioIOLayout::const_default()
-        },
-    ];
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = DEFAULT_INSTRUMENT_LAYOUTS;
 
-    const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
-    const MIDI_OUTPUT: MidiConfig = MidiConfig::MidiCCs;
+    const MIDI_INPUT: MidiConfig = DEFAULT_MIDI_INPUT;
+    const MIDI_OUTPUT: MidiConfig = DEFAULT_MIDI_OUTPUT;
 
     type SysExMessage = ();
     type BackgroundTask = ();
@@ -72,7 +58,7 @@ impl Plugin for MidiTransform {
         _buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>,
     ) -> bool {
-        self.log_event(format_args!(
+        NihLogger.log(format_args!(
             "[Transposer] Instantiated {} v{} (Build: {} | Time: {})",
             env!("CARGO_PKG_NAME"),
             env!("CARGO_PKG_VERSION"),
@@ -89,147 +75,14 @@ impl Plugin for MidiTransform {
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         while let Some(event) = context.next_event() {
-            match event {
-                NoteEvent::NoteOn {
-                    note,
-                    velocity,
-                    channel,
-                    timing,
-                    voice_id,
-                } => {
-                    let note_idx = (note & 0x7F) as usize;
-                    self.held_notes[note_idx] = true;
-
-                    if self.root_note.is_none() {
-                        for p in 0..128 {
-                            if let Some((sounding_note, sounding_voice)) =
-                                self.sounding_pitch[p].take()
-                            {
-                                context.send_event(NoteEvent::NoteOff {
-                                    timing,
-                                    channel,
-                                    note: sounding_note,
-                                    velocity: 0.0,
-                                    voice_id: sounding_voice,
-                                });
-                            }
-                        }
-
-                        self.root_note = Some(note);
-                        self.current_pitch = Some(note);
-                        self.step_count = 0;
-
-                        self.sounding_pitch[note_idx] = Some((note, voice_id));
-                        self.log_event(format_args!(
-                            "[Transposer] Reset Triggered (New Root) | Root: {}",
-                            note
-                        ));
-
-                        context.send_event(event);
-                    } else if let Some(root) = self.root_note {
-                        let root_idx = (root & 0x7F) as usize;
-                        if note != root {
-                            // Mute active root note output
-                            if let Some((root_pitch, root_voice)) =
-                                self.sounding_pitch[root_idx].take()
-                            {
-                                context.send_event(NoteEvent::NoteOff {
-                                    timing,
-                                    channel,
-                                    note: root_pitch,
-                                    velocity: 0.0,
-                                    voice_id: root_voice,
-                                });
-                            }
-
-                            // Mute prior note assigned to this physical offset key
-                            if let Some((prev_pitch, prev_voice)) =
-                                self.sounding_pitch[note_idx].take()
-                            {
-                                context.send_event(NoteEvent::NoteOff {
-                                    timing,
-                                    channel,
-                                    note: prev_pitch,
-                                    velocity: 0.0,
-                                    voice_id: prev_voice,
-                                });
-                            }
-
-                            // Calculate interval relative to root
-                            let interval = note as i32 - root as i32;
-                            self.step_count += 1;
-
-                            let base_pitch = self.current_pitch.unwrap_or(root) as i32;
-                            let target_pitch = (base_pitch + interval).clamp(0, 127) as u8;
-
-                            self.current_pitch = Some(target_pitch);
-
-                            self.log_event(format_args!(
-                                "[Transposer] Root: {} | Interval: {:+} | Step: {} -> Out Pitch: {}",
-                                root, interval, self.step_count, target_pitch
-                            ));
-
-                            self.sounding_pitch[note_idx] = Some((target_pitch, voice_id));
-
-                            context.send_event(NoteEvent::NoteOn {
-                                timing,
-                                channel,
-                                note: target_pitch,
-                                velocity,
-                                voice_id,
-                            });
-                        }
+            if let Some(domain_evt) = nih_to_domain(&event) {
+                self.engine.handle_event(domain_evt, |out_domain_evt| {
+                    if let Some(out_nih_evt) = domain_to_nih(out_domain_evt) {
+                        context.send_event(out_nih_evt);
                     }
-                }
-
-                NoteEvent::NoteOff {
-                    note,
-                    channel,
-                    timing,
-                    ..
-                } => {
-                    let note_idx = (note & 0x7F) as usize;
-                    self.held_notes[note_idx] = false;
-
-                    if let Some((sounding_note, sounding_voice)) =
-                        self.sounding_pitch[note_idx].take()
-                    {
-                        context.send_event(NoteEvent::NoteOff {
-                            timing,
-                            channel,
-                            note: sounding_note,
-                            velocity: 0.0,
-                            voice_id: sounding_voice,
-                        });
-                    }
-
-                    if !self.held_notes.iter().any(|&h| h) {
-                        for p in 0..128 {
-                            if let Some((sounding_note, sounding_voice)) =
-                                self.sounding_pitch[p].take()
-                            {
-                                context.send_event(NoteEvent::NoteOff {
-                                    timing,
-                                    channel,
-                                    note: sounding_note,
-                                    velocity: 0.0,
-                                    voice_id: sounding_voice,
-                                });
-                            }
-                        }
-
-                        self.root_note = None;
-                        self.current_pitch = None;
-                        self.step_count = 0;
-                        self.log_event(format_args!(
-                            "[Transposer] Reset Triggered (All Notes Released)"
-                        ));
-                    }
-                }
-
-                _ => {
-                    context.send_event(event);
-                }
+                });
+            } else {
+                context.send_event(event);
             }
         }
 
